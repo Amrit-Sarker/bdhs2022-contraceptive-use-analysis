@@ -1,0 +1,316 @@
+---
+title: "Contraceptive Use Analysis in Bangladesh"
+author: "Amrit Sarker"
+format: pdf
+editor: visual
+---
+
+## 1 Introduction:
+
+The **BDHS IR dataset** provides nationally representative data on women aged 15–49 in Bangladesh. It includes fertility, family planning, maternal-child health, and socio-demographic variables such as total children ever born (`v201`), age at first birth (`v212`), contraceptive use (`v312`), education (`v106`), wealth (`v190`), residence (`v025`), and division (`v024`). This dataset enables analysis of patterns and determinants of contraceptive use and fertility across population groups.
+
+## 2 Loading packages and dataset:
+
+```{r}
+library(haven)
+library(tidyverse)
+library(ggplot2)
+
+bdir <- haven::read_dta("E:/study files/AST330 Stata for Data Science/BDIR81FL.DTA")
+
+```
+
+### 2.1 Data cleaning and Variable selection:
+
+```{r}
+fertility_vars <- bdir |> 
+    select(v012, v024, v025, v106, v190, 
+           v201, v212, v312)
+
+fertility <- fertility_vars %>%
+    mutate(
+        v024 = as_factor(v024), 
+        v025 = as_factor(v025),  
+        v106 = as_factor(v106),  
+        v190 = as_factor(v190),  
+        v312 = as_factor(v312)
+    ) %>%
+    mutate(
+        across(c(v012, v201, v212), ~na_if(., 99))
+    )
+
+fertility <- fertility %>%
+    mutate(
+        contraceptive = case_when(
+            is.na(v312) | v312 == "not using" ~ "Not Using",
+            TRUE ~ "Using"
+        ),
+        contraceptive = factor(contraceptive, levels = c("Using", "Not Using"))
+    )
+
+fertility <- fertility %>%
+    mutate(age_sq = v012^2)
+```
+
+We select variables related to fertility, contraceptive use, socio-demographics, and administrative divisions. Categorical variables are converted to factors, missing values are handled, and a new binary variable `contraceptive` is created to indicate current use. An `age_sq` variable is generated to capture the non-linear effect of age in logistic regression.
+
+## 3 Exploratory Data Analysis (EDA):
+
+### 3.1 Histogram of total children ever born:
+
+```{r}
+fertility |> 
+    ggplot(aes(x = v201)) +
+    geom_histogram(binwidth = 1, fill = "steelblue", color = "black") +
+    labs(
+        title = "Distribution of Total Child Ever Born", 
+        x = "Total Child Ever Born", 
+        y = "Count"
+    ) +
+    scale_x_continuous(breaks = 0:12)
+```
+
+The histogram shows the distribution of total children ever born among women. Most women have 1–3 children, with very few having more than 7.
+
+### 3.2 Distribution of age of mother at first birth:
+
+```{r}
+fertility |> 
+    ggplot(aes(x = v212)) +
+    geom_histogram(binwidth = 1, fill = "skyblue", color = "black") +
+    labs(
+        title = "Distribution of Age of Mother at First Birth", 
+        x = "Age of Mother at First Birth", 
+        y = "Count"
+    ) +
+    scale_x_continuous(breaks = seq(5, 40, 5))
+```
+
+The age at first birth is roughly concentrated between 13 and 25 years, with a smaller number of women giving birth at later ages.
+
+### 3.3 Boxplot of total children by education:
+
+```{r}
+fertility |> 
+    ggplot(aes(v106, v201, fill = v106)) +
+    geom_boxplot() +
+    labs(
+        title = "Total child ever born by Education", 
+        x = "Education level", 
+        y = "Total child born"
+    ) +
+    theme(legend.position = "none")
+```
+
+Women with higher education tend to have fewer children compared to women with primary or no education.
+
+### 3.4 Boxplot of age at first birth by education:
+
+```{r}
+fertility |> 
+    ggplot(aes(v106, v212, fill = v106)) +
+    geom_boxplot() +
+    labs(
+        title = "Age at first birth by education level", 
+        x = "Education level", 
+        y = "Age at first birth"
+    ) +
+    theme(legend.position = "none")
+```
+
+Women with higher education tend to have their first child at older ages, while women with no or primary education start childbearing earlier.
+
+### 3.5 Boxplot of age at first birth by Wealth:
+
+```{r}
+fertility |> 
+    ggplot(aes(v190, v212, fill = v190)) +
+    geom_boxplot() +
+    labs(
+        title = "Age at first birth by Wealth", 
+        x = "Wealth", 
+        y = "Age at first birth"
+    ) +
+    theme(legend.position = "none")
+```
+
+Age at first birth is slightly higher among women from richer households compared to poorer households, suggesting wealth may delay childbearing.
+
+### 3.6 Boxplot of age at first birth by Division:
+
+```{r}
+fertility |> 
+    ggplot(aes(v024, v212, fill = v024)) +
+    geom_boxplot() +
+    labs(
+        title = "Age at first birth by Division", 
+        x = "Division", 
+        y = "Age at first birth"
+    ) +
+    theme(legend.position = "none")
+```
+
+There are regional differences in age at first birth, with some divisions showing higher median ages than others, reflecting geographic variation in fertility patterns. But all the divisions are showing mean ages of first birth is under 20.
+
+## 4 Contraceptive use visualisation: 
+
+### 4.1 Bar plot of contraceptive use by wealth:
+
+```{r}
+fertility %>%
+    ggplot(aes(x = v190, fill = contraceptive)) +
+    geom_bar(position = "fill") +  
+    scale_fill_manual(values = c("Using" = "darkgreen", "Not Using" = "lightgray")) +
+    labs(
+        title = "Current Contraceptive Use by Wealth Index",
+        x = "Wealth Index",
+        y = "Percentage",
+        fill = "Contraceptive Use"
+    ) 
+```
+
+The plot shows that percentage of using contraceptive tends to **decrease with wealth**. Contraceptive use is slightly higher among women from poorer households. This may reflect cultural, regional, or survey-specific patterns in family plannin
+
+### 4.2 Bar plot of contraceptive use by Education level:
+
+```{r}
+fertility %>%
+    ggplot(aes(x = v106, fill = contraceptive)) +
+    geom_bar(position = "fill") + 
+    scale_fill_manual(values = c("Using" = "forestgreen", "Not Using" = "lightgray")) +
+    labs(
+        title = "Current Contraceptive Use by Education level",
+        x = "Education level",
+        y = "Percentage",
+        fill = "Contraceptive Use"
+    ) 
+```
+
+Women with primary and secondary education have the highest contraceptive use, higher-educated women use less, and women with no education use the least.
+
+### 4.3 Bar plot of contraceptive use by place of residence:
+
+```{r}
+fertility %>%
+    ggplot(aes(x = v025, fill = contraceptive)) +
+    geom_bar(position = "fill") + 
+    scale_fill_manual(values = c("Using" = "forestgreen", "Not Using" = "lightgray")) +
+    labs(
+        title = "Current Contraceptive Use by place of residence",
+        x = "Place of residenc",
+        y = "Percentage",
+        fill = "Contraceptive Use"
+    ) 
+```
+
+Percentage of using contraceptive is slightly higher in rural areas, but urban and rural women have similar usage rates.
+
+### 4.4 Bar plot of contraceptive use by Division:
+
+```{r}
+fertility %>%
+    ggplot(aes(x = v024, fill = contraceptive)) +
+    geom_bar(position = "fill") + 
+    scale_fill_manual(values = c("Using" = "forestgreen", "Not Using" = "lightgray")) +
+    labs(
+        title = "Current Contraceptive Use by Division",
+        x = "Division",
+        y = "Percentage",
+        fill = "Contraceptive Use"
+    )
+```
+
+There are clear regional differences in contraceptive use. Divisions such as Rajshahi and Rangpur show higher usage rates compared to divisions like Chattogram or Sylhet.
+
+### 4.5 Trend of Contraceptive use by Age:
+
+```{r}
+fertility %>%
+    filter(!is.na(v012), !is.na(contraceptive)) %>%
+    ggplot(aes(x = v012, y = as.numeric(contraceptive == "Using"))) +
+    geom_smooth(method = "loess", color = "forestgreen", se = FALSE) +
+    labs(
+        title = "Trend of Contraceptive Use by Age",
+        x = "Age",
+        y = "Probability of Using"
+    ) +
+    scale_y_continuous(labels = scales::percent_format())
+
+```
+
+Contraceptive use follows an inverse U-shaped pattern with age: it rises during young adulthood, peaks around 36/37 years, and then declines at older ages. This suggests that age has a nonlinear effect on contraceptive behavior.
+
+## 5 Chi-square test of association: 
+
+### 5.1 Contraceptive use by Education:
+
+```{r}
+table_education <- table(fertility$contraceptive, fertility$v106)
+chi_edu <- chisq.test(table_education)
+chi_edu$p.value
+```
+
+The chi-square test indicates a strong association between education and contraceptive use (p \< 0.001), confirming that usage patterns differ significantly across education levels.
+
+### 5.2 Contraceptive use by Wealth:
+
+```{r}
+table_wealth <- table(fertility$contraceptive, fertility$v190)
+chi_wealth <- chisq.test(table_wealth)
+chi_wealth$p.value
+```
+
+Contraceptive use varies significantly across wealth groups (p ≈ 0.004). Women from poorer households use contraception more than those from richer households, consistent with the visual pattern.
+
+### 5.3 Contraceptive use by Residence:
+
+```{r}
+table_residence <- table(fertility$contraceptive, fertility$v025)
+chisq.test(table_residence)$p.value
+```
+
+There is a statistically significant difference in contraceptive use between rural and urban women (p ≈ 0.00025), though usage rates are **very similar** in both groups.
+
+### 5.4 Contraceptive use by Division:
+
+```{r}
+table_division <- table(fertility$contraceptive, fertility$v024)
+chisq.test(table_division)$p.value
+```
+
+Contraceptive use differs significantly across divisions (p \< 0.001). Some divisions, such as Rajshahi and Rangpur, have higher usage, while others, like Sylhet, have lower usage.
+
+## 6 Logistic Regression: Descriptive Association of Contraceptive Use
+
+To understand the factors influencing contraceptive use while controlling for other variables, a binary logistic regression was fitted. The outcome variable is contraceptive use (Using vs Not Using). Predictors include:
+
+\- Age (`v012`) and Age squared (`age_sq`) to capture the nonlinear trend \
+- Education level (`v106`) \
+- Wealth index (`v190`) \
+- Place of residence (`v025`) \
+- Division (`v024`)
+
+```{r}
+model_logit <- glm(
+    contraceptive ~ v012 + age_sq + v106 + v190 + v025 + v024,
+    data = fertility,
+    family = binomial
+)
+
+summary(model_logit)
+
+```
+
+**Key Insights:**
+
+**Age:** Contraceptive use follows an **inverse U-shape**, peaking around mid-30s.
+
+**Education:** Primary and secondary education increase use; higher education is not significant.
+
+**Wealth:** Only the richest group shows significantly higher use.
+
+**Residence:** Rural and urban use are nearly similar.
+
+**Division:** Usage varies across divisions, highest in Rajshahi and Rangpur, lowest in Sylhet.
+
+*The logistic regression largely confirms patterns observed in exploratory plots. While it provides statistical evidence of associations, its predictive power is limited; the main purpose here is analytical rather than predictive.*
