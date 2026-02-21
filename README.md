@@ -14,6 +14,7 @@ The BDHS is a nationally representative survey that collects data on fertility, 
 
 | File | Description |
 |------|-------------|
+| `bdhs2022-contraceptive-analysis.R` | Raw R file of this analysis |
 | `bdhs2022-contraceptive-analysis.qmd` | Quarto document with full analysis and narrative storytelling |
 | `bdhs2022-contraceptive-analysis.pdf` | Rendered PDF output of the Quarto report |
 | `fertility.csv` | Cleaned analysis dataset (derived from BDHS 2022) |
